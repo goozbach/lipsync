@@ -53,7 +53,12 @@ lipsync-build-conf(){
 # generate ssh key
 lipsync-keygen(){
   # TODO generate new key for lipsync
-  sleep 1
+  if [[ -f ${HOME}/.ssh/id_dsa-lipsync ]]
+  then
+    echo " lipsync ssh key already exists, not creating new one"
+  else
+    #TODO create lipsync key
+  fi
 }
 
 # add ssh config
@@ -67,5 +72,4 @@ lipsync-update-profile(){
   #TODO add steps which update bash, ksh, zsh profile scripts
   sleep 1
 }
-
 
