@@ -1,0 +1,59 @@
+#!/bin/bash
+lipsync-prereqs(){
+  ########################################
+  # Check for required software
+  ########################################
+  echo -n "* Checking for required software..."
+  type -P ssh &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
+  type -P ssh-copy-id &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
+  #TODO check rsync version both local and remote
+  type -P rsync &>/dev/null || { echo; echo "	ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
+  type -P lsyncd &>/dev/null || { echo; echo "	ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
+  echo "ok"
+}
+
+# ask the questions
+lipsync-questions(){
+	echo -n "> SERVER: IP or domainname: "
+	read remote_server
+
+	echo -n "> SERVER: SSH port: "
+	read port
+	
+	echo -n "> SERVER/CLIENT: username (must exist on both): "
+    	read username
+    
+	echo -n "> CLIENT: directory to be synced: "
+	read lipsync_dir_local
+
+	echo -n "> SERVER: remote directory to be synced: "
+	read lipsync_dir_remote
+}
+
+lipsync-build-conf(){
+	echo -n "* Creating lipsyncd config..."
+  cp etc/lipsyncd ${HOME}/.lipsyncd/lipsyncdrc
+  # begin nasty long sed replaces all the configs with stuff
+	sed -i.orig -e 's|LSLOCDIR|'$lipsync_dir_local/'|g' -e 's|LSUSER|'$username'|g' -e 's|LSPORT|'$port'|g' -e 's|LSREMSERV|'$remote_server'|g' -e 's|LSREMDIR|'$lipsync_dir_remote'|g' ${HOME}/.lipsyncd/lipsyncdrc
+	echo "done"
+}
+
+# generate ssh key
+lipsync-keygen(){
+  # TODO generate new key for lipsync
+  sleep 1
+}
+
+# add ssh config
+lipsync-ssh-config(){
+  # TODO make the ssh config get put in place
+  sleep 1
+}
+
+# update profile scripts
+lipsync-update-profile(){
+  #TODO add steps which update bash, ksh, zsh profile scripts
+  sleep 1
+}
+
+
