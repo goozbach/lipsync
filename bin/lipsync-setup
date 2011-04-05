@@ -38,6 +38,20 @@ lipsync-questions(){
 	echo -n "> CLIENT: directory to be synced: "
 	read lipsync_dir_local
 
+	echo -n "> CLIENT: ssh config file[~/.ssh/config]: "
+	read lipsync_ssh_config
+  if [[ -z ${lipsync_ssh_config} ]]
+  then
+    lipsync_ssh_config="~/.ssh/config"
+  fi
+
+	echo -n "> CLIENT: ssh key file[~/.ssh/id_dsa_lipsync]: "
+	read lipsync_ssh_key
+  if [[ -z ${lipsync_ssh_key} ]]
+  then
+    lipsync_ssh_key="~/.ssh/id_dsa_lipsync"
+  fi
+
 	echo -n "> SERVER: remote directory to be synced: "
 	read lipsync_dir_remote
 }
@@ -61,10 +75,22 @@ lipsync-keygen(){
   fi
 }
 
+# remove ssh config
+lipsync-clean-ssh(){
+  sed -i.lipsync.restore -e '/#START LIPSYNC/,/#END LIPSYNC/d' ${lipsync_ssh_config}
+}
+
 # add ssh config
 lipsync-ssh-config(){
-  # TODO make the ssh config get put in place
-  sleep 1
+  # TODO check to see if there and remove
+  sed -i.lipbak -e "1i\
+#START LIPSYNC\n\
+Host lipsync\n\
+  HostName ${remote_server}\n\
+  IdentiyFile ${identiyfile}\n\
+  port ${port}\n\
+#END LIPSYNC\n\
+" ${lipsync_ssh_config}
 }
 
 # update profile scripts
