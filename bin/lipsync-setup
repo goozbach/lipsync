@@ -1,29 +1,4 @@
 #!/bin/bash
-lipsync-prereq-rsync(){
-  type -P rsync &>/dev/null || { echo; echo "	ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
-  RSYNC_VERS=$(rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
-  RSYNC_MAJOR=${RSYNC_VERS%%.*}
-  if [[ ${RSYNC_MAJOR} -lt 3 ]];
-  then
-    echo; echo " ERROR: lipsync requires rsync > 3.0.0 but it's version ${RSYNC_VERS}" >&2;
-    exit 1
-  else
-    return
-  fi
-}
-
-lipsync-prereqs(){
-  ########################################
-  # Check for required software
-  ########################################
-  echo -n "* Checking for required software..."
-  type -P ssh &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
-  type -P ssh-copy-id &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
-  lipsync-prereq-rsync
-  type -P lsyncd &>/dev/null || { echo; echo "	ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
-  echo "ok"
-}
-
 # ask the questions
 lipsync-questions(){
 	echo -n "> SERVER: IP or domainname: "
@@ -55,6 +30,42 @@ lipsync-questions(){
 	echo -n "> SERVER: remote directory to be synced: "
 	read lipsync_dir_remote
 }
+
+# check rsync pre-req local and remote
+lipsync-prereq-rsync(){
+  type -P rsync &>/dev/null || { echo; echo "	ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
+  RSYNC_VERS=$(rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
+  RSYNC_MAJOR=${RSYNC_VERS%%.*}
+  RSYNC_VERS_REMOTE=$(ssh -p ${port} ${username}@${remote_server} rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
+  RSYNC_MAJOR_REMOTE=${RSYNC_VERS_REMOTE%%.*}
+  if [[ ${RSYNC_MAJOR} -lt 3 ]];
+  then
+    echo; echo " ERROR: lipsync requires rsync > 3.0.0 but it's version ${RSYNC_VERS}" >&2;
+    exit 1
+  else
+    return
+  fi
+  if [[ ${RSYNC_MAJOR_REMOTE} -lt 3 ]];
+  then
+    echo; echo " ERROR: lipsync requires the remote server rsync to be > 3.0.0 but it's version ${RSYNC_VERS_REMOTE}" >&2;
+    exit 1
+  else
+    return
+  fi
+}
+
+lipsync-prereqs(){
+  ########################################
+  # Check for required software
+  ########################################
+  echo -n "* Checking for required software..."
+  type -P ssh &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
+  type -P ssh-copy-id &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
+  lipsync-prereq-rsync
+  type -P lsyncd &>/dev/null || { echo; echo "	ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
+  echo "ok"
+}
+
 
 lipsync-build-conf(){
 	echo -n "* Creating lipsyncd config..."
