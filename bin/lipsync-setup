@@ -36,7 +36,7 @@ lipsync-prereq-rsync(){
   type -P rsync &>/dev/null || { echo; echo "	ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
   RSYNC_VERS=$(rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
   RSYNC_MAJOR=${RSYNC_VERS%%.*}
-  RSYNC_VERS_REMOTE=$(ssh -p ${port} ${username}@${remote_server} rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
+  RSYNC_VERS_REMOTE=$(ssh -p ${port} ${username}@${remote_server} rsync --version 2>/dev/null | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
   RSYNC_MAJOR_REMOTE=${RSYNC_VERS_REMOTE%%.*}
   if [[ ${RSYNC_MAJOR} -lt 3 ]];
   then
@@ -63,15 +63,18 @@ lipsync-prereqs(){
   type -P ssh-copy-id &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
   lipsync-prereq-rsync
   type -P lsyncd &>/dev/null || { echo; echo "	ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
-  echo "ok"
+  echo " OK"
 }
 
 
 lipsync-build-conf(){
 	echo -n "* Creating lipsyncd config..."
+  # TODO copy from system-wide /etc/lipsyncdrc.skel
   cp etc/lipsyncd ${HOME}/.lipsyncd/lipsyncdrc
   # begin nasty long sed replaces all the configs with stuff
 	sed -i.orig -e 's|LSLOCDIR|'$lipsync_dir_local/'|g' -e 's|LSUSER|'$username'|g' -e 's|LSPORT|'$port'|g' -e 's|LSREMSERV|'$remote_server'|g' -e 's|LSREMDIR|'$lipsync_dir_remote'|g' ${HOME}/.lipsyncd/lipsyncdrc
+  echo "LIPSYNC_SSH_CONFIG=\"$lipsync_ssh_config\"" >> ${HOME}/.lipsyncd/lipsyncdrc
+  echo "LIPSYNC_SSH_KEY=\"lipsync_ssh_key\"" >> ${HOME}/.lipsyncd/lipsyncdrc
 	echo "done"
 }
 
@@ -83,6 +86,7 @@ lipsync-keygen(){
     echo " lipsync ssh key already exists, not creating new one"
   else
     #TODO create lipsync key
+    echo "creating lipsync key"
   fi
 }
 
@@ -100,7 +104,7 @@ Host lipsync\n\
   HostName ${remote_server}\n\
   IdentiyFile ${identiyfile}\n\
   port ${port}\n\
-#END LIPSYNC\n\
+#END LIPSYNC\
 " ${lipsync_ssh_config}
 }
 
