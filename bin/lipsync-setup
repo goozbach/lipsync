@@ -1,39 +1,40 @@
 #!/bin/bash
 # ask the questions
 lipsync-questions(){
-	echo -n "> SERVER: IP or domainname: "
-	read remote_server
+  echo -n "> SERVER: IP or domainname: "
+  read remote_server
 
-	echo -n "> SERVER: SSH port: "
-	read port
-	
-	echo -n "> SERVER/CLIENT: username (must exist on both): "
-    	read username
-    
-	echo -n "> CLIENT: directory to be synced: "
-	read lipsync_dir_local
+  echo -n "> SERVER: SSH port: "
+  read port
+  
+  echo -n "> SERVER/CLIENT: username (must exist on both): "
+      read username
 
-	echo -n "> CLIENT: ssh config file[~/.ssh/config]: "
-	read lipsync_ssh_config
+  echo -n "> SERVER: remote directory to be synced: "
+  read lipsync_dir_remote
+
+  echo -n "> CLIENT: directory to be synced: "
+  read lipsync_dir_local
+
+  echo -n "> CLIENT: ssh config file[\${HOME}/.ssh/config]: "
+  read lipsync_ssh_config
   if [[ -z ${lipsync_ssh_config} ]]
   then
-    lipsync_ssh_config="~/.ssh/config"
+    lipsync_ssh_config="\${HOME}/.ssh/config"
   fi
 
-	echo -n "> CLIENT: ssh key file[~/.ssh/id_dsa_lipsync]: "
-	read lipsync_ssh_key
+  echo -n "> CLIENT: ssh key file[\${HOME}/.ssh/id_dsa_lipsync]: "
+  read lipsync_ssh_key
   if [[ -z ${lipsync_ssh_key} ]]
   then
-    lipsync_ssh_key="~/.ssh/id_dsa_lipsync"
+    lipsync_ssh_key="\${HOME}/.ssh/id_dsa_lipsync"
   fi
 
-	echo -n "> SERVER: remote directory to be synced: "
-	read lipsync_dir_remote
 }
 
 # check rsync pre-req local and remote
 lipsync-prereq-rsync(){
-  type -P rsync &>/dev/null || { echo; echo "	ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
+  type -P rsync &>/dev/null || { echo; echo "  ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
   RSYNC_VERS=$(rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
   RSYNC_MAJOR=${RSYNC_VERS%%.*}
   RSYNC_VERS_REMOTE=$(ssh -p ${port} ${username}@${remote_server} rsync --version 2>/dev/null | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
@@ -59,36 +60,74 @@ lipsync-prereqs(){
   # Check for required software
   ########################################
   echo -n "* Checking for required software..."
-  type -P ssh &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
-  type -P ssh-copy-id &>/dev/null || { echo; echo "	ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
+  type -P ssh &>/dev/null || { echo; echo "  ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
+  type -P ssh-copy-id &>/dev/null || { echo; echo "  ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
   lipsync-prereq-rsync
-  type -P lsyncd &>/dev/null || { echo; echo "	ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
+  type -P lsyncd &>/dev/null || { echo; echo "  ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
   echo " OK"
 }
 
-
 lipsync-build-conf(){
-	echo -n "* Creating lipsyncd config..."
+  echo -n "* Creating lipsyncd config..."
   # TODO copy from system-wide /etc/lipsyncdrc.skel
   cp etc/lipsyncd ${HOME}/.lipsyncd/lipsyncdrc
   # begin nasty long sed replaces all the configs with stuff
-	sed -i.orig -e 's|LSLOCDIR|'$lipsync_dir_local/'|g' -e 's|LSUSER|'$username'|g' -e 's|LSPORT|'$port'|g' -e 's|LSREMSERV|'$remote_server'|g' -e 's|LSREMDIR|'$lipsync_dir_remote'|g' ${HOME}/.lipsyncd/lipsyncdrc
-  echo "LIPSYNC_SSH_CONFIG=\"$lipsync_ssh_config\"" >> ${HOME}/.lipsyncd/lipsyncdrc
-  echo "LIPSYNC_SSH_KEY=\"lipsync_ssh_key\"" >> ${HOME}/.lipsyncd/lipsyncdrc
-	echo "done"
+  sed -i.orig -e 's|LSLOCDIR|'${lipsync_dir_local}'|g' -e 's|LSUSER|'${username}'|g' -e 's|LSPORT|'${port}'|g' -e 's|LSREMSERV|'${remote_server}'|g' -e 's|LSREMDIR|'${lipsync_dir_remote}'|g' ${HOME}/.lipsyncd/lipsyncdrc
+  echo "LIPSYNC_SSH_CONFIG=\"${lipsync_ssh_config}\"" >> ${HOME}/.lipsyncd/lipsyncdrc
+  echo "LIPSYNC_SSH_KEY=\"${lipsync_ssh_key}\"" >> ${HOME}/.lipsyncd/lipsyncdrc
+  echo " DONE"
 }
 
 # generate ssh key
 lipsync-keygen(){
-  # TODO generate new key for lipsync
-  if [[ -f ${HOME}/.ssh/id_dsa-lipsync ]]
-  then
-    echo " lipsync ssh key already exists, not creating new one"
+  echo -n "* No existing key found, creating SSH key for ${username}..."
+  ssh-keygen -q -N '' -f ${lipsync_ssh_key}
+  if [[ $? -eq 0 ]]; then
+    chown -R ${username}:${username} /home/${username}/.ssh #TODO figure out why?
+    echo " DONE"
   else
-    #TODO create lipsync key
-    echo "creating lipsync key"
+    echo; echo "  ERROR: there was an error generating the ssh key"; exit 1
+  fi
+}    
+
+lipsync-transfer-key(){
+  echo "* Transferring ssh key for ${username} to ${remote_server} on port ${port} (login as ${username} now)..."; 
+  su ${username} -c "ssh-copy-id -i ${lipsync_ssh_key} '-p ${port} ${username}@${remote_server}'" > /dev/null
+  if [[ $? -eq 0 ]]; then
+    echo " DONE"
+  else
+    echo; echo "  ERROR: there was an error transferring the ssh key"; exit 1
+  fi
+
+  echo -n "* Setting permissions on the ssh key for ${username} on ${remote_server} on port ${port}..."; 
+  su ${username} -c "SSH_AUTH_SOCK=0 ssh ${remote_server} -p ${port} 'chmod 700 .ssh'"
+  if [[ $? -eq 0 ]]; then
+    echo " DONE"
+  else
+    echo; echo "  ERROR: there was an error setting permissions on the ssh key for ${username} on ${remote_server} on port ${port}..."; exit 1
   fi
 }
+
+# check to see if the key needs to be generated
+lipsync-checkkey(){
+  # TODO generate new key for lipsync
+  if [[ -f ${lipsync_ssh_key} ]]
+  then
+    echo " lipsync ssh key already exists, not creating new one"
+    if ssh -i ${lipsync_ssh_key} -p ${port} -o "KbdInteractiveAuthentication=no" -o "PasswordAuthentication=no" ${username}@${remote_server} echo "hello" > /dev/null
+    then
+      echo "ssh key seems to be properly set up, skipping key generation and transfer steps"
+      return 0
+    else
+      lipsync-keygen
+      lipsync-transfer-key
+    fi
+  else
+    lipsync-keygen
+    lipsync-transfer-key
+  fi
+}
+
 
 # remove ssh config
 lipsync-clean-ssh(){
@@ -111,6 +150,13 @@ Host lipsync\n\
 # update profile scripts
 lipsync-update-profile(){
   #TODO add steps which update bash, ksh, zsh profile scripts
+  echo "Updating profile scripts to enable lipsync..."
   sleep 1
 }
 
+### main loop order
+# ask questions
+# check key
+# prereqs
+# add ssh config
+# update profile script
