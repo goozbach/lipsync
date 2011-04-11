@@ -1,0 +1,12 @@
+* ADD log level to config and questions
+* discover what sed does with a non-existant file
+* discover if user-privs check is needed with per-user arch
+* discover if variant check is needed with per-user arch
+* Create dpkg/ppa and rpm/yum repo
+ * github gh-pages works as a repo
+* Finish backup of ssh key
+* discover if chmod of .ssh is needed
+* Finish installed date message append
+* Finish configure() and unconfigure() subroutines
+* Add "this will install lipsync..." warning with escape
+* Add config file exists check and verify before blowing it away
