@@ -16,18 +16,18 @@ lipsync-questions(){
   echo -n "> CLIENT: directory to be synced: "
   read lipsync_dir_local
 
-  echo -n "> CLIENT: ssh config file[\${HOME}/.ssh/config]: "
+  echo -n "> CLIENT: ssh config file[${HOME}/.ssh/config]: "
   read lipsync_ssh_config
   if [[ -z ${lipsync_ssh_config} ]]
   then
-    lipsync_ssh_config="\${HOME}/.ssh/config"
+    lipsync_ssh_config="${HOME}/.ssh/config"
   fi
 
-  echo -n "> CLIENT: ssh key file[\${HOME}/.ssh/id_dsa_lipsync]: "
+  echo -n "> CLIENT: ssh key file[${HOME}/.ssh/id_dsa_lipsync]: "
   read lipsync_ssh_key
   if [[ -z ${lipsync_ssh_key} ]]
   then
-    lipsync_ssh_key="\${HOME}/.ssh/id_dsa_lipsync"
+    lipsync_ssh_key="${HOME}/.ssh/id_dsa_lipsync"
   fi
 
 }
@@ -62,26 +62,65 @@ lipsync-prereqs(){
   echo -n "* Checking for required software..."
   type -P ssh &>/dev/null || { echo; echo "  ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
   type -P ssh-copy-id &>/dev/null || { echo; echo "  ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
-  lipsync-prereq-rsync
   type -P lsyncd &>/dev/null || { echo; echo "  ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
   echo " OK"
 }
 
 lipsync-build-conf(){
   echo -n "* Creating lipsyncd config..."
+  if [[ ! -d ${HOME}/.lipsyncd/ ]]
+  then
+    mkdir ${HOME}/.lipsyncd/
+  fi
   # TODO copy from system-wide /etc/lipsyncdrc.skel
   cp etc/lipsyncd ${HOME}/.lipsyncd/lipsyncdrc
   # begin nasty long sed replaces all the configs with stuff
-  sed -i.orig -e 's|LSLOCDIR|'${lipsync_dir_local}'|g' -e 's|LSUSER|'${username}'|g' -e 's|LSPORT|'${port}'|g' -e 's|LSREMSERV|'${remote_server}'|g' -e 's|LSREMDIR|'${lipsync_dir_remote}'|g' ${HOME}/.lipsyncd/lipsyncdrc
-  echo "LIPSYNC_SSH_CONFIG=\"${lipsync_ssh_config}\"" >> ${HOME}/.lipsyncd/lipsyncdrc
-  echo "LIPSYNC_SSH_KEY=\"${lipsync_ssh_key}\"" >> ${HOME}/.lipsyncd/lipsyncdrc
+  sed -i.orig -e 's|LSLOCDIR|'${lipsync_dir_local}'|g' -e 's|LSUSER|'${username}'|g' -e 's|LSPORT|'${port}'|g' -e 's|LSREMSERV|'${remote_server}'|g' -e 's|LSREMDIR|'${lipsync_dir_remote}'|g' -e 's|LSSSHCONFIG|${lipsync_ssh_config}|g' -e 's|LSSSHKEY|${lipsync_ssh_key}|g' ${HOME}/.lipsyncd/lipsyncdrc
   echo " DONE"
+}
+
+# remove ssh config
+lipsync-clean-ssh(){
+  if [[ -f ${lipsync_ssh_config} ]]
+  then
+    sed -i.lipsync.restore -e '/#START LIPSYNC/,/#END LIPSYNC/d' ${lipsync_ssh_config}
+  fi
+}
+
+# add ssh config
+lipsync-ssh-config(){
+  if [[ ! -f ${lipsync_ssh_config} ]]
+  then
+    echo "creating ssh config"
+    touch ${lipsync_ssh_config}
+  fi
+  echo "running sed" #DEBUG
+  echo sed -i.lipbak -e "1i\
+#START LIPSYNC\n\
+Host lipsync\n\
+  HostName ${remote_server}\n\
+  IdentiyFile ${identiyfile}\n\
+  port ${port}\n\
+#END LIPSYNC\
+" ${lipsync_ssh_config}
+  sed -i.lipbak -e "1i\
+#START LIPSYNC\n\
+Host lipsync\n\
+  HostName ${remote_server}\n\
+  IdentiyFile ${identiyfile}\n\
+  port ${port}\n\
+#END LIPSYNC\
+" ${lipsync_ssh_config}
+  echo set return $?
+  chmod 0600 ${lipsync_ssh_config}
 }
 
 # generate ssh key
 lipsync-keygen(){
   echo -n "* No existing key found, creating SSH key for ${username}..."
-  ssh-keygen -q -N '' -f ${lipsync_ssh_key}
+  echo
+  echo ssh-keygen -q -N '' -f $(echo ${lipsync_ssh_key})
+  ssh-keygen -q -N '' -f $(echo ${lipsync_ssh_key})
   if [[ $? -eq 0 ]]; then
     chown -R ${username}:${username} /home/${username}/.ssh #TODO figure out why?
     echo " DONE"
@@ -92,7 +131,8 @@ lipsync-keygen(){
 
 lipsync-transfer-key(){
   echo "* Transferring ssh key for ${username} to ${remote_server} on port ${port} (login as ${username} now)..."; 
-  su ${username} -c "ssh-copy-id -i ${lipsync_ssh_key} '-p ${port} ${username}@${remote_server}'" > /dev/null
+  echo -e "\nssh-copy-id -i ${lipsync_ssh_key} ${username}@${remote_server} > /dev/null"
+  ssh-copy-id -i ${lipsync_ssh_key} ${username}@${remote_server} > /dev/null
   if [[ $? -eq 0 ]]; then
     echo " DONE"
   else
@@ -100,7 +140,7 @@ lipsync-transfer-key(){
   fi
 
   echo -n "* Setting permissions on the ssh key for ${username} on ${remote_server} on port ${port}..."; 
-  su ${username} -c "SSH_AUTH_SOCK=0 ssh ${remote_server} -p ${port} 'chmod 700 .ssh'"
+  SSH_AUTH_SOCK=0 ssh ${remote_server} -p ${port} 'chmod 700 .ssh'
   if [[ $? -eq 0 ]]; then
     echo " DONE"
   else
@@ -120,32 +160,16 @@ lipsync-checkkey(){
       return 0
     else
       lipsync-keygen
+      lipsync-ssh-config
       lipsync-transfer-key
     fi
   else
     lipsync-keygen
+    lipsync-ssh-config
     lipsync-transfer-key
   fi
 }
 
-
-# remove ssh config
-lipsync-clean-ssh(){
-  sed -i.lipsync.restore -e '/#START LIPSYNC/,/#END LIPSYNC/d' ${lipsync_ssh_config}
-}
-
-# add ssh config
-lipsync-ssh-config(){
-  # TODO check to see if there and remove
-  sed -i.lipbak -e "1i\
-#START LIPSYNC\n\
-Host lipsync\n\
-  HostName ${remote_server}\n\
-  IdentiyFile ${identiyfile}\n\
-  port ${port}\n\
-#END LIPSYNC\
-" ${lipsync_ssh_config}
-}
 
 # update profile scripts
 lipsync-update-profile(){
@@ -155,8 +179,11 @@ lipsync-update-profile(){
 }
 
 ### main loop order
-# ask questions
-# check key
 # prereqs
+# ask questions
+lipsync-questions
+# check key
+lipsync-checkkey
 # add ssh config
+# lipsync-prereq-rsync
 # update profile script
