@@ -1,5 +1,5 @@
 * ADD log level to config and questions
-* discover what sed does with a non-existant file
+* discover what sed does with a non-existant file -- DONE
 * discover if user-privs check is needed with per-user arch
 * discover if variant check is needed with per-user arch
 * Create dpkg/ppa and rpm/yum repo
