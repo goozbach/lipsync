@@ -32,20 +32,11 @@ lipsync-questions(){
 
 }
 
-# check rsync pre-req local and remote
-lipsync-prereq-rsync(){
-  type -P rsync &>/dev/null || { echo; echo "  ERROR: lipsync requires rsync but it's not installed" >&2; exit 1; }
-  RSYNC_VERS=$(rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
-  RSYNC_MAJOR=${RSYNC_VERS%%.*}
+# check rsync pre-req remote
+lipsync-prereq-remote(){
+  echo -n "* Checking for required remote software..."
   RSYNC_VERS_REMOTE=$(ssh -p ${port} ${username}@${remote_server} rsync --version 2>/dev/null | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
   RSYNC_MAJOR_REMOTE=${RSYNC_VERS_REMOTE%%.*}
-  if [[ ${RSYNC_MAJOR} -lt 3 ]];
-  then
-    echo; echo " ERROR: lipsync requires rsync > 3.0.0 but it's version ${RSYNC_VERS}" >&2;
-    exit 1
-  else
-    return
-  fi
   if [[ ${RSYNC_MAJOR_REMOTE} -lt 3 ]];
   then
     echo; echo " ERROR: lipsync requires the remote server rsync to be > 3.0.0 but it's version ${RSYNC_VERS_REMOTE}" >&2;
@@ -53,13 +44,25 @@ lipsync-prereq-rsync(){
   else
     return
   fi
+  echo " OK"
 }
 
-lipsync-prereqs(){
+# check rsync pre-req local
+lipsync-prereq-local(){
   ########################################
-  # Check for required software
+  # Check for required local software
   ########################################
-  echo -n "* Checking for required software..."
+  echo -n "* Checking for required local software..."
+  type -P rsync &>/dev/null || { echo; echo "  ERROR: lipsync requires rsync but it's not installed locally." >&2; exit 1; }
+  RSYNC_VERS=$(rsync --version | grep '^rsync *version' | tr -s ' ' | cut -f 3 -d ' ')
+  RSYNC_MAJOR=${RSYNC_VERS%%.*}
+  if [[ ${RSYNC_MAJOR} -lt 3 ]];
+  then
+    echo; echo " ERROR: lipsync requires rsync > 3.0.0 but the local version is ${RSYNC_VERS}" >&2;
+    exit 1
+  else
+    return
+  fi
   type -P ssh &>/dev/null || { echo; echo "  ERROR: lipsync requires ssh-client but it's not installed" >&2; exit 1; }
   type -P ssh-copy-id &>/dev/null || { echo; echo "  ERROR: lipsync requires ssh-copy-id but it's not installed" >&2; exit 1; }
   type -P lsyncd &>/dev/null || { echo; echo "  ERROR: lipsync requires lsyncd but it's not installed" >&2; exit 1; }
@@ -172,7 +175,7 @@ lipsync-update-profile(){
 
 ### main loop order
 # prereqs
-lipsync-prereqs
+lipsync-prereq-local
 
 # ask questions
 lipsync-questions
@@ -187,7 +190,7 @@ lipsync-ssh-config
 lipsync-transfer-key
 
 # lipsync-prereq-rsync
-lipsync-prereq-rsync
+lipsync-prereq-remote
 
 # update profile script
 lipsync-update-profile
