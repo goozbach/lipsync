@@ -10,3 +10,19 @@
 * Finish configure() and unconfigure() subroutines
 * Add "this will install lipsync..." warning with escape
 * Add config file exists check and verify before blowing it away
+* write lipsync-start script
+ * checks ssh-agent running and starts if not
+ * checks ssh-key working prints error and exits
+ * checks pid and exits if already running
+ * debug flag printing things it's doing
+ * sourced by startup scripts
+* create lipsync library (used by all scripts)
+ * findpid() returns PID of running daemon, or exit?
+ * getconf() sources the configfile and sets up the vars
+ * prompt() output a Y/N prompt and exit if no?
+ * remove() -- completey remove lipsync config
+   * backup directory to $(date)?
+   * log the timestamp removed
+   * prompt to verify
+   * echo the backup for optional removal
+

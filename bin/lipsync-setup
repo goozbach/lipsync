@@ -91,35 +91,29 @@ lipsync-clean-ssh(){
 lipsync-ssh-config(){
   if [[ ! -f ${lipsync_ssh_config} ]]
   then
-    echo "creating ssh config"
-    touch ${lipsync_ssh_config}
+    echo -n "* creating ssh config"
+    echo "" >> ${lipsync_ssh_config}
   fi
-  echo "running sed" #DEBUG
-  echo sed -i.lipbak -e "1i\
+sed -i.lipbak -e "1i\
 #START LIPSYNC\n\
 Host lipsync\n\
   HostName ${remote_server}\n\
-  IdentiyFile ${identiyfile}\n\
+  IdentityFile ${lipsync_ssh_key}\n\
   port ${port}\n\
-#END LIPSYNC\
+#END LIPSYNC\n\
 " ${lipsync_ssh_config}
-  sed -i.lipbak -e "1i\
-#START LIPSYNC\n\
-Host lipsync\n\
-  HostName ${remote_server}\n\
-  IdentiyFile ${identiyfile}\n\
-  port ${port}\n\
-#END LIPSYNC\
-" ${lipsync_ssh_config}
-  echo set return $?
   chmod 0600 ${lipsync_ssh_config}
+  if grep lipsync ${lipsync_ssh_config} &> /dev/null
+  then
+    echo " DONE"
+  else
+    echo; echo "  ERROR: there was an error creating the ssh config"; exit 1
+  fi
 }
 
 # generate ssh key
 lipsync-keygen(){
   echo -n "* No existing key found, creating SSH key for ${username}..."
-  echo
-  echo ssh-keygen -q -N '' -f $(echo ${lipsync_ssh_key})
   ssh-keygen -q -N '' -f $(echo ${lipsync_ssh_key})
   if [[ $? -eq 0 ]]; then
     chown -R ${username}:${username} /home/${username}/.ssh #TODO figure out why?
@@ -130,8 +124,8 @@ lipsync-keygen(){
 }    
 
 lipsync-transfer-key(){
-  echo "* Transferring ssh key for ${username} to ${remote_server} on port ${port} (login as ${username} now)..."; 
-  echo -e "\nssh-copy-id -i ${lipsync_ssh_key} ${username}@${remote_server} > /dev/null"
+  echo "* Transferring ssh key for ${username} to ${remote_server} on port ${port}"
+  echo -n "  (login as ${username} now)... " 
   ssh-copy-id -i ${lipsync_ssh_key} ${username}@${remote_server} > /dev/null
   if [[ $? -eq 0 ]]; then
     echo " DONE"
@@ -139,7 +133,8 @@ lipsync-transfer-key(){
     echo; echo "  ERROR: there was an error transferring the ssh key"; exit 1
   fi
 
-  echo -n "* Setting permissions on the ssh key for ${username} on ${remote_server} on port ${port}..."; 
+  echo "* Setting permissions on the ssh key for ${username} on ${remote_server} on port ${port}..."; 
+  echo -n "  (login as ${username} now)... " 
   SSH_AUTH_SOCK=0 ssh ${remote_server} -p ${port} 'chmod 700 .ssh'
   if [[ $? -eq 0 ]]; then
     echo " DONE"
@@ -160,13 +155,9 @@ lipsync-checkkey(){
       return 0
     else
       lipsync-keygen
-      lipsync-ssh-config
-      lipsync-transfer-key
     fi
   else
     lipsync-keygen
-    lipsync-ssh-config
-    lipsync-transfer-key
   fi
 }
 
@@ -180,10 +171,18 @@ lipsync-update-profile(){
 
 ### main loop order
 # prereqs
+
 # ask questions
 lipsync-questions
+
 # check key
 lipsync-checkkey
-# add ssh config
+
+# create ssh config
+lipsync-ssh-config
+
+# transfer key
+lipsync-transfer-key
+
 # lipsync-prereq-rsync
 # update profile script
