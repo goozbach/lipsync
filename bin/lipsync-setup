@@ -165,12 +165,14 @@ lipsync-checkkey(){
 # update profile scripts
 lipsync-update-profile(){
   #TODO add steps which update bash, ksh, zsh profile scripts
-  echo "Updating profile scripts to enable lipsync..."
+  echo -n "Updating profile scripts to enable lipsync..."
   sleep 1
+  echo " DONE" 
 }
 
 ### main loop order
 # prereqs
+lipsync-prereqs
 
 # ask questions
 lipsync-questions
@@ -185,4 +187,7 @@ lipsync-ssh-config
 lipsync-transfer-key
 
 # lipsync-prereq-rsync
+lipsync-prereq-rsync
+
 # update profile script
+lipsync-update-profile
